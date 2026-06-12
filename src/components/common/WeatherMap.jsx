@@ -1,71 +1,74 @@
-import { useEffect, useRef } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import './WeatherMap.css';
 
-const cityMarkers = [
-  { name: 'Tumakuru', lat: 13.3409, lon: 77.101, temp: 26 },
-  { name: 'Kolar', lat: 13.136, lon: 78.129, temp: 27 },
-  { name: 'Mandya', lat: 12.5218, lon: 76.8951, temp: 28 },
-  { name: 'Hosur', lat: 12.7409, lon: 77.8253, temp: 27 },
-];
-
-export default function WeatherMap({ lat, lon, cityName }) {
+function WeatherMap({ lat, lon, cityName, temperature }) {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
+  const markerRef = useRef(null);
 
   useEffect(() => {
-    if (!mapRef.current || mapInstance.current) return;
+    if (!mapRef.current || lat == null || lon == null) return;
 
-    const map = L.map(mapRef.current, {
-      zoomControl: false,
-      attributionControl: false,
-    }).setView([lat, lon], 9);
+    if (!mapInstance.current) {
+      const map = L.map(mapRef.current, {
+        zoomControl: false,
+        attributionControl: false,
+      }).setView([lat, lon], 10);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-    }).addTo(map);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+      }).addTo(map);
 
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+      mapInstance.current = map;
+    } else {
+      mapInstance.current.flyTo([lat, lon], 10, { duration: 0.75 });
+      window.setTimeout(() => mapInstance.current?.invalidateSize(), 150);
+    }
 
-    const createIcon = (temp) =>
+    const tempLabel = temperature != null ? `${temperature}°` : '—';
+    const createIcon = () =>
       L.divIcon({
         className: 'weather-map-marker',
-        html: `<div class="map-pin"><span>${temp}°</span></div>`,
-        iconSize: [48, 48],
-        iconAnchor: [24, 24],
+        html: `<div class="map-pin" role="img" aria-label="${cityName || 'Location'}, ${tempLabel}">
+          <div class="map-pin__bubble">
+            <span class="map-pin__dot"></span>
+            <span class="map-pin__temp">${tempLabel}</span>
+          </div>
+          <span class="map-pin__needle"></span>
+        </div>`,
+        iconSize: [1, 1],
+        iconAnchor: [0, 0],
       });
 
-    cityMarkers.forEach((c) => {
-      L.marker([c.lat, c.lon], { icon: createIcon(c.temp) })
-        .bindTooltip(c.name, { permanent: false })
-        .addTo(map);
-    });
+    markerRef.current?.remove();
 
-    L.marker([lat, lon], { icon: createIcon('●') })
-      .bindTooltip(cityName || 'Current', { permanent: true, direction: 'top' })
-      .addTo(map);
-
-    mapInstance.current = map;
+    markerRef.current = L.marker([lat, lon], { icon: createIcon() })
+      .bindTooltip(cityName || 'Current location', {
+        permanent: true,
+        direction: 'top',
+        offset: [0, -42],
+        className: 'map-tooltip',
+      })
+      .addTo(mapInstance.current);
 
     return () => {
-      map.remove();
-      mapInstance.current = null;
+      markerRef.current?.remove();
+      markerRef.current = null;
     };
-  }, [lat, lon, cityName]);
-
-  useEffect(() => {
-    mapInstance.current?.setView([lat, lon], 9);
-  }, [lat, lon]);
+  }, [lat, lon, cityName, temperature]);
 
   return (
-    <div className="weather-map-wrapper">
+    <div
+      className="weather-map-wrapper"
+      role="region"
+      aria-label={`Weather map for ${cityName || 'selected location'}`}
+    >
       <div ref={mapRef} className="weather-map" />
-      <div className="weather-map-legend">
-        <span><i className="dot rain" /> Rain</span>
-        <span><i className="dot clouds" /> Clouds</span>
-        <span><i className="dot snow" /> Snow</span>
-        <span><i className="dot clear" /> Clear</span>
-      </div>
     </div>
   );
 }
+
+export default memo(WeatherMap);

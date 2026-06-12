@@ -7,14 +7,13 @@ import {
   Wind,
   Eye,
   Gauge,
-  Sun,
 } from 'lucide-react';
 import TopNavbar from '../components/layout/TopNavbar';
 import WeatherIcon from '../components/common/WeatherIcon';
-import LoadingSpinner from '../components/common/LoadingSpinner';
+import WeatherSkeleton from '../components/common/WeatherSkeleton';
 import { TemperatureChart, PrecipitationChart } from '../components/charts/WeatherCharts';
 import { useApp } from '../context/AppContextCore';
-import { groupForecastByDay } from '../services/weatherApi';
+import { groupForecastByDay, getAqiValue } from '../services/weatherApi';
 import {
   kelvinToCelsius,
   convertTemp,
@@ -26,7 +25,6 @@ import {
   convertWind,
   windUnitLabel,
   degToDirection,
-  getUvStatus,
   getAqiStatus,
   getMoonPhase,
 } from '../utils/formatters';
@@ -37,10 +35,34 @@ export default function Forecast() {
   const { weather, loading, settings } = useApp();
   const [tab, setTab] = useState('daily');
 
-  if (loading && !weather) return <LoadingSpinner />;
+  if (loading && !weather) {
+    return (
+      <>
+        <TopNavbar title="Forecast" subtitle="Detailed weather forecast for the upcoming days." onMenuClick={onMenuClick} />
+        <div className="main-layout__content forecast-page">
+          <WeatherSkeleton type="forecast-grid" />
+          <WeatherSkeleton type="charts" />
+          <WeatherSkeleton type="aqi" />
+        </div>
+      </>
+    );
+  }
 
-  const current = weather?.current;
-  const tz = current?.timezone || 0;
+  if (!weather?.current) {
+    return (
+      <>
+        <TopNavbar title="Forecast" subtitle="Detailed weather forecast for the upcoming days." onMenuClick={onMenuClick} />
+        <div className="main-layout__content forecast-page">
+          <div className="empty-state">
+            <h3>No forecast data</h3>
+            <p>Enable location or search for a city to view the forecast.</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+  const current = weather.current;
+  const tz = current.timezone || 0;
   const unit = tempLabel(settings.tempUnit);
 
   const dailyForecast = weather?.forecast
@@ -58,11 +80,8 @@ export default function Forecast() {
   );
   const precipValues = dailyForecast.map((d) => Math.round(d.pop * 12));
 
-  const aqi = weather?.airQuality?.list?.[0]?.main?.aqi
-    ? weather.airQuality.list[0].main.aqi * 25
-    : 42;
-
-  const aqiPercent = Math.min((aqi / 150) * 100, 100);
+  const aqi = getAqiValue(weather.airQuality);
+  const aqiPercent = aqi != null ? Math.min((aqi / 150) * 100, 100) : 0;
 
   return (
     <>
@@ -81,6 +100,8 @@ export default function Forecast() {
                 type="button"
                 className={`forecast-tab ${tab === t ? 'forecast-tab--active' : ''}`}
                 onClick={() => setTab(t)}
+                aria-pressed={tab === t}
+                aria-label={`${t === '7days' ? '7 Days' : t.charAt(0).toUpperCase() + t.slice(1)} forecast`}
               >
                 {t === '7days' ? '7 Days' : t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
@@ -100,7 +121,11 @@ export default function Forecast() {
                   {formatTime(item.dt, tz, settings.timeFormat === '12')}
                 </div>
                 <div style={{ margin: '8px 0' }}>
-                  <WeatherIcon icon={item.weather[0].icon} size={28} />
+                  <WeatherIcon
+                    icon={item.weather[0].icon}
+                    description={item.weather[0].description}
+                    size={28}
+                  />
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 700 }}>
                   {convertTemp(kelvinToCelsius(item.main.temp), settings.tempUnit)}°
@@ -120,7 +145,7 @@ export default function Forecast() {
                 <div className="seven-day-card__label">{i === 0 ? 'Today' : formatDay(day.dt, tz)}</div>
                 <div className="seven-day-card__date">{formatShortDate(day.dt, tz)}</div>
                 <div className="seven-day-card__icon">
-                  <WeatherIcon icon={day.icon} size={36} />
+                  <WeatherIcon icon={day.icon} description={day.description} size={36} />
                 </div>
                 <div className="seven-day-card__max">
                   {convertTemp(kelvinToCelsius(day.max), settings.tempUnit)}°
@@ -196,14 +221,7 @@ export default function Forecast() {
                   icon: <Gauge size={18} />,
                   color: '#7C5CFF',
                   label: 'Pressure',
-                  value: `${current?.main?.pressure || '--'} mb`,
-                },
-                {
-                  icon: <Sun size={18} />,
-                  color: '#FFD93D',
-                  label: 'UV Index',
-                  value: '5',
-                  sub: getUvStatus(5),
+                  value: `${current.main.pressure} mb`,
                 },
               ].map((d) => (
                 <div key={d.label} className="detail-mini">
@@ -246,7 +264,13 @@ export default function Forecast() {
               </span>
               <span>
                 Solar Noon
-                <strong>12:29 PM</strong>
+                <strong>
+                  {formatTime(
+                    Math.round((current.sys.sunrise + current.sys.sunset) / 2),
+                    tz,
+                    settings.timeFormat === '12'
+                  )}
+                </strong>
               </span>
               <span>
                 Sunset
@@ -260,30 +284,36 @@ export default function Forecast() {
             <div className="moon-phase">{getMoonPhase()}</div>
           </div>
 
-          <div className="aqi-card">
+          <div className="aqi-card" aria-label="Air quality index">
             <h4>Air Quality</h4>
-            <div className="aqi-gauge">
-              <svg viewBox="0 0 120 120" width="120" height="120">
-                <circle cx="60" cy="60" r="50" fill="none" stroke="#E7ECF5" strokeWidth="10" />
-                <circle
-                  cx="60"
-                  cy="60"
-                  r="50"
-                  fill="none"
-                  stroke="#12B76A"
-                  strokeWidth="10"
-                  strokeDasharray={`${(aqiPercent / 100) * 314} 314`}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="aqi-gauge__center">
-                <div className="aqi-gauge__value">{aqi}</div>
-                <div className="aqi-gauge__label">{getAqiStatus(aqi)}</div>
-              </div>
-            </div>
-            <a href="#aqi" className="aqi-link">
-              View More →
-            </a>
+            {loading && !weather?.airQuality ? (
+              <WeatherSkeleton type="aqi" />
+            ) : (
+              <>
+                <div className="aqi-gauge">
+                  <svg viewBox="0 0 120 120" width="120" height="120" aria-hidden="true">
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#E7ECF5" strokeWidth="10" />
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      fill="none"
+                      stroke="#12B76A"
+                      strokeWidth="10"
+                      strokeDasharray={`${(aqiPercent / 100) * 314} 314`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="aqi-gauge__center">
+                    <div className="aqi-gauge__value">{aqi ?? '—'}</div>
+                    <div className="aqi-gauge__label">{aqi != null ? getAqiStatus(aqi) : 'Unavailable'}</div>
+                  </div>
+                </div>
+                <a href="#aqi" className="aqi-link">
+                  View More →
+                </a>
+              </>
+            )}
           </div>
         </div>
       </div>

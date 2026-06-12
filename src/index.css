@@ -62,6 +62,15 @@ button {
   background: none;
 }
 
+button:focus-visible,
+a:focus-visible,
+[role='button']:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent-purple);
+  outline-offset: 2px;
+}
+
 input,
 select {
   font-family: inherit;
@@ -157,6 +166,242 @@ ul {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* Skeleton loaders */
+.skeleton-hero {
+  position: relative;
+  min-height: 260px;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.skeleton-hero__image {
+  position: absolute;
+  inset: 0;
+  min-height: 260px;
+}
+
+.skeleton-hero__content {
+  position: relative;
+  z-index: 1;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton-line {
+  height: 14px;
+  border-radius: 6px;
+}
+
+.skeleton-line--xs { width: 40%; height: 12px; }
+.skeleton-line--sm { width: 55%; }
+.skeleton-line--md { width: 45%; }
+.skeleton-line--xl { width: 35%; height: 48px; margin: 8px 0; }
+
+.skeleton-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+}
+
+.skeleton-metric {
+  height: 120px;
+  border-radius: var(--radius-md);
+}
+
+.skeleton-search {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton-search-item {
+  height: 72px;
+  border-radius: var(--radius-md);
+}
+
+.skeleton-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.skeleton-card {
+  height: 280px;
+  border-radius: var(--radius-lg);
+}
+
+.skeleton-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.skeleton-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+.skeleton-preview__hero {
+  height: 220px;
+  border-radius: var(--radius-lg);
+}
+
+.skeleton-preview__bar {
+  height: 56px;
+  border-radius: var(--radius-md);
+}
+
+.skeleton-preview__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.skeleton-metric--sm {
+  height: 96px;
+}
+
+.skeleton-forecast-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.skeleton-forecast-chip {
+  height: 140px;
+  border-radius: var(--radius-md);
+}
+
+.skeleton-forecast-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeleton-map {
+  width: 100%;
+}
+
+.skeleton-map__canvas {
+  height: 280px;
+  border-radius: var(--radius-md);
+}
+
+.skeleton-aqi {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.skeleton-aqi__gauge {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+}
+
+.skeleton-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.skeleton-chart {
+  height: 260px;
+  border-radius: var(--radius-md);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.empty-state h3 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.empty-state p {
+  font-size: 14px;
+  color: var(--secondary-text);
+  margin-bottom: 20px;
+}
+
+.empty-state__btn {
+  padding: 12px 24px;
+  background: var(--accent-purple);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.empty-state__btn:disabled {
+  opacity: 0.7;
+}
+
+.empty-state__link {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-purple);
+}
+
+.dashboard__error {
+  margin-bottom: 16px;
+}
+
+@media (max-width: 768px) {
+  .skeleton-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .skeleton-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .skeleton-forecast-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .skeleton-charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .skeleton-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .skeleton-forecast-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .skeleton-preview__metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 360px) {
+  .skeleton-forecast-row {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 /* Dark theme */

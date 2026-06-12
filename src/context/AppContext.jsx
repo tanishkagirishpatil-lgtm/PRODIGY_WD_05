@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { AppContext } from './AppContextCore';
 import {
   getWeatherByCoords,
-  getWeatherByCity,
-  searchCities,
-  hasApiKey,
-  getDemoWeather,
+  getWeatherByLocation,
+  searchLocations,
+  reverseGeocode,
+  assertApiKey,
 } from '../services/weatherApi';
+import { getGeolocationErrorMessage, getWeatherErrorMessage } from '../utils/errors';
 
 const DEFAULT_SETTINGS = {
   tempUnit: 'C',
@@ -23,23 +24,15 @@ const DEFAULT_PROFILE = {
   name: 'Tanishka',
   email: 'tanishka@example.com',
   phone: '+91 98765 43210',
-  location: 'Bangalore, India',
+  location: '',
   memberSince: 'May 25, 2024',
   avatar: 'https://i.pravatar.cc/150?img=47',
   premium: true,
   connectedEmail: 'tanishka@gmail.com',
 };
 
-const DEFAULT_SAVED_LOCATIONS = [
-  { name: 'Bangalore', country: 'IN', state: 'Karnataka', lat: 12.9716, lon: 77.5946, isCurrent: true },
-  { name: 'Mumbai', country: 'IN', state: 'Maharashtra', lat: 19.076, lon: 72.8777 },
-  { name: 'Delhi', country: 'IN', state: 'Delhi', lat: 28.7041, lon: 77.1025 },
-  { name: 'Pune', country: 'IN', state: 'Maharashtra', lat: 18.5204, lon: 73.8567 },
-  { name: 'Chennai', country: 'IN', state: 'Tamil Nadu', lat: 13.0827, lon: 80.2707 },
-  { name: 'Kolkata', country: 'IN', state: 'West Bengal', lat: 22.5726, lon: 88.3639 },
-];
-
 function sameLocation(a, b) {
+  if (!a || !b) return false;
   return (
     a.name?.toLowerCase() === b.name?.toLowerCase() &&
     a.country === b.country &&
@@ -50,60 +43,128 @@ function sameLocation(a, b) {
 
 export function AppProvider({ children }) {
   const [settings, setSettings] = useLocalStorage('skycast-settings', DEFAULT_SETTINGS);
-  const [savedLocations, setSavedLocations] = useLocalStorage('skycast-saved', DEFAULT_SAVED_LOCATIONS);
-  const [recentSearches, setRecentSearches] = useLocalStorage('skycast-recent', [
-    'Mumbai',
-    'Delhi',
-    'Pune',
-    'Chennai',
-    'New York',
-  ]);
+  const [savedLocations, setSavedLocations] = useLocalStorage('skycast-saved', []);
+  const [recentSearches, setRecentSearches] = useLocalStorage('skycast-recent', []);
   const [profile, setProfile] = useLocalStorage('skycast-profile', DEFAULT_PROFILE);
+  const [currentLocation, setCurrentLocation] = useLocalStorage('skycast-current-location', null);
 
-  const [coords, setCoords] = useState({ lat: 12.9716, lon: 77.5946 });
+  const [coords, setCoords] = useState(() =>
+    currentLocation ? { lat: currentLocation.lat, lon: currentLocation.lon } : null
+  );
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [locationLoading, setLocationLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [locationError, setLocationError] = useState(null);
 
-  const fetchWeather = useCallback(async (lat, lon) => {
+  const weatherRequestId = useRef(0);
+
+  const loadWeatherAt = useCallback(async (lat, lon, geo = null) => {
+    const requestId = ++weatherRequestId.current;
     setLoading(true);
     setError(null);
+
     try {
-      let data;
-      if (hasApiKey()) {
-        data = await getWeatherByCoords(lat, lon);
-      } else {
-        data = getDemoWeather();
-      }
+      assertApiKey();
+      const data = await getWeatherByCoords(lat, lon);
+      if (requestId !== weatherRequestId.current) return null;
+
       setWeather(data);
       setCoords({ lat, lon });
+
+      if (geo) {
+        setCurrentLocation(geo);
+        setProfile((p) => ({
+          ...p,
+          location: `${geo.name}${geo.state ? `, ${geo.state}` : ''}, ${geo.country}`,
+        }));
+      }
+
+      return data;
     } catch (err) {
-      setError(err.message);
-      if (!weather) setWeather(getDemoWeather());
+      if (requestId !== weatherRequestId.current) return null;
+      setError(getWeatherErrorMessage(err));
+      throw err;
     } finally {
-      setLoading(false);
+      if (requestId === weatherRequestId.current) {
+        setLoading(false);
+      }
     }
-  }, [weather]);
+  }, [setCurrentLocation, setProfile]);
 
   const requestLocation = useCallback(() => {
+    setLocationError(null);
+
     if (!navigator.geolocation) {
-      setError('Geolocation is not supported by your browser');
-      return;
+      setLocationError('Geolocation is not supported by your browser.');
+      return Promise.reject(new Error('unsupported'));
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setSettings((s) => ({ ...s, locationEnabled: true }));
-        fetchWeather(pos.coords.latitude, pos.coords.longitude);
-      },
-      () => setError('Unable to retrieve your location')
-    );
-  }, [fetchWeather, setSettings]);
+
+    setLocationLoading(true);
+
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          try {
+            const { latitude, longitude } = pos.coords;
+            const geo = await reverseGeocode(latitude, longitude);
+            await loadWeatherAt(latitude, longitude, geo);
+            setSettings((s) => ({ ...s, locationEnabled: true }));
+            setLocationError(null);
+            resolve(geo);
+          } catch (err) {
+            const message = getWeatherErrorMessage(err);
+            setLocationError(message);
+            reject(err);
+          } finally {
+            setLocationLoading(false);
+          }
+        },
+        (geoErr) => {
+          const message = getGeolocationErrorMessage(geoErr);
+          setLocationError(message);
+          setSettings((s) => ({ ...s, locationEnabled: false }));
+          setLocationLoading(false);
+          reject(geoErr);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      );
+    });
+  }, [loadWeatherAt, setSettings]);
 
   useEffect(() => {
-    const id = window.setTimeout(() => {
-      fetchWeather(coords.lat, coords.lon);
-    }, 0);
-    return () => window.clearTimeout(id);
+    let active = true;
+
+    async function init() {
+      try {
+        assertApiKey();
+
+    if (currentLocation?.lat != null && currentLocation?.lon != null) {
+          await loadWeatherAt(currentLocation.lat, currentLocation.lon, currentLocation);
+          if (active && !settings.locationEnabled) {
+            setSettings((s) => ({ ...s, locationEnabled: true }));
+          }
+          return;
+        }
+
+        if (settings.locationEnabled) {
+          await requestLocation();
+          return;
+        }
+
+        if (active) {
+          setLoading(false);
+          setError('Enable location access or search for a city to view weather.');
+        }
+      } catch {
+        if (active) setLoading(false);
+      }
+    }
+
+    init();
+    return () => {
+      active = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -113,52 +174,40 @@ export function AppProvider({ children }) {
 
   const searchWeather = async (query) => {
     if (!query.trim()) return [];
-    try {
-      if (hasApiKey()) {
-        return await searchCities(query);
-      }
-      return [
-        { name: 'Mumbai', state: 'Maharashtra', country: 'IN', lat: 19.076, lon: 72.8777 },
-        { name: 'Delhi', state: 'Delhi', country: 'IN', lat: 28.7041, lon: 77.1025 },
-        { name: 'Pune', state: 'Maharashtra', country: 'IN', lat: 18.5204, lon: 73.8567 },
-        { name: 'Chennai', state: 'Tamil Nadu', country: 'IN', lat: 13.0827, lon: 80.2707 },
-        { name: 'Kolkata', state: 'West Bengal', country: 'IN', lat: 22.5726, lon: 88.3639 },
-        { name: 'Bangalore', state: 'Karnataka', country: 'IN', lat: 12.9716, lon: 77.5946 },
-      ].filter((c) => c.name.toLowerCase().includes(query.toLowerCase()));
-    } catch {
-      return [];
-    }
+    assertApiKey();
+    return searchLocations(query, 10);
   };
 
-  const fetchCityWeather = async (city) => {
+  const fetchCityWeather = async (location) => {
     setLoading(true);
     setError(null);
     try {
-      let data;
-      if (hasApiKey()) {
-        data = await getWeatherByCity(city);
-      } else {
-        data = getDemoWeather();
-        data.current.name = city;
-      }
+      assertApiKey();
+      const loc =
+        typeof location === 'string'
+          ? (await searchLocations(location, 1))[0]
+          : location;
+
+      if (!loc) throw new Error(`No results found for "${location}".`);
+
+      const data = await getWeatherByLocation(loc);
       setWeather(data);
-      if (data.current?.coord) {
-        setCoords({ lat: data.current.coord.lat, lon: data.current.coord.lon });
-      }
-      addRecentSearch(city);
+      setCoords({ lat: loc.lat, lon: loc.lon });
+      addRecentSearch(loc.name, loc.state, loc.country);
       return data;
     } catch (err) {
-      setError(err.message);
+      setError(getWeatherErrorMessage(err));
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  const addRecentSearch = (city) => {
+  const addRecentSearch = (name, state = '', country = '') => {
+    const label = `${name}${state ? `, ${state}` : ''}${country ? `, ${country}` : ''}`;
     setRecentSearches((prev) => {
-      const filtered = prev.filter((c) => c.toLowerCase() !== city.toLowerCase());
-      return [city, ...filtered].slice(0, 8);
+      const filtered = prev.filter((item) => item.toLowerCase() !== label.toLowerCase());
+      return [label, ...filtered].slice(0, 8);
     });
   };
 
@@ -198,9 +247,12 @@ export function AppProvider({ children }) {
         updateProfile,
         weather,
         loading,
+        locationLoading,
         error,
+        locationError,
         coords,
-        fetchWeather,
+        currentLocation,
+        fetchWeather: loadWeatherAt,
         fetchCityWeather,
         searchWeather,
         requestLocation,

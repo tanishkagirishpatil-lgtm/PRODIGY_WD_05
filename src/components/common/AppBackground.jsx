@@ -19,10 +19,11 @@ function FloatingClouds({ count = 3 }) {
   );
 }
 
-function RainLayer() {
+function RainLayer({ heavy = false }) {
+  const dropCount = heavy ? 55 : 40;
   return (
-    <div className="app-background__rain" aria-hidden="true">
-      {Array.from({ length: 40 }, (_, i) => (
+    <div className={`app-background__rain ${heavy ? 'app-background__rain--heavy' : ''}`} aria-hidden="true">
+      {Array.from({ length: dropCount }, (_, i) => (
         <span
           key={i}
           className="app-background__drop"
@@ -72,9 +73,11 @@ export default function AppBackground() {
   });
 
   const pageBg = getPageBackground(mood, timeOfDay, isDark);
-  const showRain = mood === 'rain';
+  const showRain = mood === 'rain' || mood === 'thunderstorm';
+  const showMist = mood === 'mist';
   const showStarsLayer = timeOfDay === 'night' && settings.theme !== 'dark';
-  const cloudCount = mood === 'clear' ? 2 : mood === 'cloudy' ? 4 : 3;
+  const cloudCount =
+    mood === 'clear' ? 2 : mood === 'cloudy' || mood === 'mist' ? 5 : mood === 'thunderstorm' ? 4 : 3;
 
   return (
     <div
@@ -93,7 +96,8 @@ export default function AppBackground() {
       <div className="app-background__orb app-background__orb--3" />
       <FloatingClouds count={cloudCount} />
       {showStarsLayer && <StarField />}
-      {showRain && <RainLayer />}
+      {showRain && <RainLayer heavy={mood === 'thunderstorm'} />}
+      {showMist && <div className="app-background__fog" aria-hidden="true" />}
       <div className="app-background__grid" />
       <div className="app-background__horizon" />
     </div>

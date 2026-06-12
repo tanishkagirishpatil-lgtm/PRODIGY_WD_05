@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import { MapPin, MoreVertical, Plus, Droplets, Wind, Eye, Search, X } from 'lucide-react';
 import TopNavbar from '../components/layout/TopNavbar';
-import HeroLandscape from '../components/common/HeroLandscape';
-import { getCityVariant } from '../utils/cityVariants';
-import LoadingSpinner from '../components/common/LoadingSpinner';
+import CityHeroImage from '../components/common/CityHeroImage';
+import WeatherSkeleton from '../components/common/WeatherSkeleton';
 import { useApp } from '../context/AppContextCore';
-import { getWeatherByCoords, hasApiKey, getDemoWeather } from '../services/weatherApi';
+import { getWeatherByCoords, getAqiValue } from '../services/weatherApi';
+import { getWeatherErrorMessage } from '../utils/errors';
 import {
   kelvinToCelsius,
   convertTemp,
@@ -31,22 +31,13 @@ function sameLocation(a, b) {
   );
 }
 
-function demoVariation(name) {
-  const seed = [...name].reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  return {
-    temp: 296 + (seed % 9),
-    aqi: 25 + (seed % 4) * 25,
-    humidity: 48 + (seed % 32),
-    wind: 3 + (seed % 5),
-  };
-}
-
 export default function SavedLocations() {
   const { onMenuClick } = useOutletContext();
-  const { savedLocations, addSavedLocation, removeSavedLocation, settings, searchWeather } =
+  const { savedLocations, addSavedLocation, removeSavedLocation, settings, searchWeather, currentLocation } =
     useApp();
   const [locationData, setLocationData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [query, setQuery] = useState('');
   const [candidates, setCandidates] = useState([]);
@@ -63,28 +54,24 @@ export default function SavedLocations() {
     let active = true;
 
     async function loadAll() {
+      if (!savedLocations.length) {
+        setLocationData([]);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
+      setLoadError('');
+
       const results = await Promise.all(
         savedLocations.map(async (loc) => {
           try {
-            let data;
-            if (hasApiKey()) {
-              data = await getWeatherByCoords(loc.lat, loc.lon);
-            } else {
-              const variation = demoVariation(loc.name);
-              data = getDemoWeather();
-              data.current.name = loc.name;
-              data.current.main.temp = variation.temp;
-              data.current.main.humidity = variation.humidity;
-              data.current.wind.speed = variation.wind;
-            }
-            const fallbackAqi = demoVariation(loc.name).aqi;
-            const aqi = data.airQuality?.list?.[0]?.main?.aqi
-              ? data.airQuality.list[0].main.aqi * 25
-              : fallbackAqi;
-            return { ...loc, weather: data.current, aqi };
-          } catch {
-            return { ...loc, weather: null, aqi: 42 };
+            const data = await getWeatherByCoords(loc.lat, loc.lon);
+            const aqi = getAqiValue(data.airQuality);
+            const isCurrent = currentLocation ? sameLocation(loc, currentLocation) : loc.isCurrent;
+            return { ...loc, isCurrent, weather: data.current, aqi };
+          } catch (err) {
+            return { ...loc, weather: null, aqi: null, error: getWeatherErrorMessage(err) };
           }
         })
       );
@@ -92,6 +79,10 @@ export default function SavedLocations() {
       if (active) {
         setLocationData(results);
         setLoading(false);
+        const failed = results.filter((r) => !r.weather).length;
+        if (failed === results.length) {
+          setLoadError('Unable to load saved location weather. Check your connection.');
+        }
       }
     }
 
@@ -99,7 +90,7 @@ export default function SavedLocations() {
     return () => {
       active = false;
     };
-  }, [locationKey, savedLocations]);
+  }, [locationKey, savedLocations, currentLocation]);
 
   const resetModal = () => {
     setQuery('');
@@ -132,8 +123,10 @@ export default function SavedLocations() {
       if (cities.length) {
         setSelectedCity(cities[0]);
       } else {
-        setAddError('No matching city found. Try a nearby city name.');
+        setAddError('No matching location found. Try a village, town, or district name.');
       }
+    } catch (err) {
+      setAddError(getWeatherErrorMessage(err));
     } finally {
       setAdding(false);
     }
@@ -141,7 +134,7 @@ export default function SavedLocations() {
 
   const saveSelectedCity = () => {
     if (!selectedCity) {
-      setAddError('Search and choose a city first.');
+      setAddError('Search and choose a location first.');
       return;
     }
 
@@ -186,19 +179,24 @@ export default function SavedLocations() {
           </button>
         </div>
 
+        {loadError && <div className="error-banner">{loadError}</div>}
+
         {loading ? (
-          <LoadingSpinner />
+          <WeatherSkeleton type="cards" />
         ) : savedLocations.length === 0 ? (
-          <div className="saved-empty">
-            <div className="saved-empty__icon">
-              <MapPin size={24} />
+          <div className="saved-empty" role="status">
+            <div className="saved-empty__icon saved-empty__icon--illustration" aria-hidden="true">
+              <MapPin size={28} strokeWidth={1.5} />
+              <span className="saved-empty__icon-badge">
+                <Search size={14} />
+              </span>
             </div>
-            <h3>No Saved Locations</h3>
-            <p>Add cities you check often and they will appear here.</p>
-            <button type="button" className="add-location-btn" onClick={openModal}>
-              <Plus size={16} />
-              Add Location
-            </button>
+            <h3>No saved locations yet</h3>
+            <p>Search for cities you visit often and save them for quick access.</p>
+            <Link to="/search" className="add-location-btn saved-empty__cta">
+              <Search size={16} aria-hidden="true" />
+              Search Locations
+            </Link>
           </div>
         ) : (
           <>
@@ -208,9 +206,9 @@ export default function SavedLocations() {
                 const temp = w
                   ? convertTemp(kelvinToCelsius(w.main.temp), settings.tempUnit)
                   : '--';
-                const aqiStatus = getAqiStatus(loc.aqi);
+                const aqiStatus = loc.aqi != null ? getAqiStatus(loc.aqi) : null;
                 const aqiClass =
-                  aqiStatus === 'Good' ? 'aqi-good' : 'aqi-moderate';
+                  aqiStatus === 'Good' ? 'aqi-good' : aqiStatus ? 'aqi-moderate' : '';
 
                 return (
                   <div key={locationId(loc)} className="location-card">
@@ -256,16 +254,15 @@ export default function SavedLocations() {
                         {unit}
                       </div>
                       <div className="location-card__condition">
-                        {w ? capitalize(w.weather?.[0]?.description) : '--'}
+                        {w ? capitalize(w.weather?.[0]?.description) : loc.error || 'Unavailable'}
                       </div>
                     </div>
                     <div className="location-card__illustration">
-                      <HeroLandscape
-                        variant={getCityVariant(loc.name)}
+                      <CityHeroImage
                         city={loc.name}
-                        condition={w?.weather?.[0]?.description}
-                        timestamp={w?.dt}
-                        timezone={w?.timezone || 0}
+                        state={loc.state || ''}
+                        country={loc.country}
+                        variant="card"
                         className="location-card__scene"
                       />
                     </div>
@@ -273,7 +270,7 @@ export default function SavedLocations() {
                       <div className="location-card__metric">
                         <Droplets size={14} color="#4DABF7" />
                         Humidity
-                        <strong>{w?.main?.humidity || '--'}%</strong>
+                        <strong>{w?.main?.humidity ?? '--'}%</strong>
                       </div>
                       <div className="location-card__metric">
                         <Wind size={14} color="#12B76A" />
@@ -288,7 +285,7 @@ export default function SavedLocations() {
                         <Eye size={14} color="#7C5CFF" />
                         AQI
                         <strong className={aqiClass}>
-                          {loc.aqi} {aqiStatus}
+                          {loc.aqi != null ? `${loc.aqi} ${aqiStatus}` : 'N/A'}
                         </strong>
                       </div>
                     </div>
@@ -323,7 +320,7 @@ export default function SavedLocations() {
                 <Search size={16} />
                 <input
                   type="text"
-                  placeholder="Search city name..."
+                  placeholder="Search village, town, or city..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   autoFocus

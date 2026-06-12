@@ -1,0 +1,80 @@
+.city-hero {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(135deg, #ddeeff 0%, #f3eeff 100%);
+}
+
+.city-hero--card {
+  position: relative;
+  min-height: 110px;
+  border-radius: inherit;
+}
+
+.city-hero__photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 35%;
+  display: block;
+}
+
+.city-hero__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.97) 0%,
+    rgba(255, 255, 255, 0.92) 28%,
+    rgba(255, 255, 255, 0.55) 48%,
+    rgba(255, 255, 255, 0.15) 72%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  pointer-events: none;
+}
+
+.city-hero--card .city-hero__overlay {
+  background: linear-gradient(
+    to top,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.4) 40%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+.city-hero__skeleton {
+  position: absolute;
+  inset: 0;
+}
+
+.city-hero__fallback {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.city-hero__fallback-sky {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #b8dcff 0%, #ddeeff 100%);
+}
+
+.city-hero__fallback-hills {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 45%;
+  background: linear-gradient(180deg, transparent 0%, #52b788 100%);
+  border-radius: 50% 50% 0 0 / 20% 20% 0 0;
+}
+
+[data-theme='dark'] .city-hero__overlay {
+  background: linear-gradient(
+    to right,
+    rgba(15, 23, 41, 0.95) 0%,
+    rgba(15, 23, 41, 0.85) 30%,
+    rgba(15, 23, 41, 0.35) 55%,
+    transparent 100%
+  );
+}

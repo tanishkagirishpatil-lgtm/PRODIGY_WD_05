@@ -10,6 +10,7 @@ import {
   Sunrise,
   Sunset,
   Cloud,
+  Loader2,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContextCore';
 import {
@@ -19,6 +20,7 @@ import {
   formatTime,
   capitalize,
 } from '../../utils/formatters';
+import { formatLocationLabel } from '../../services/weatherApi';
 import SidebarIllustration from '../common/SidebarIllustration';
 import WeatherIcon from '../common/WeatherIcon';
 import './Sidebar.css';
@@ -33,9 +35,17 @@ const navItems = [
 ];
 
 export default function Sidebar({ open, onClose }) {
-  const { weather, settings, requestLocation } = useApp();
+  const {
+    weather,
+    settings,
+    requestLocation,
+    currentLocation,
+    locationLoading,
+    locationError,
+  } = useApp();
   const current = weather?.current;
   const tz = current?.timezone || 0;
+  const hasLocation = Boolean(currentLocation);
 
   const temp = current
     ? convertTemp(kelvinToCelsius(current.main.temp), settings.tempUnit)
@@ -46,12 +56,12 @@ export default function Sidebar({ open, onClose }) {
     <>
       {open && <div className="sidebar-overlay" onClick={onClose} />}
       <aside className={`sidebar ${open ? 'sidebar--open' : ''}`}>
-        <div className="sidebar__logo">
+        <NavLink to="/" className="sidebar__logo" onClick={onClose} aria-label="SkyCast home">
           <div className="sidebar__logo-icon">
             <Cloud size={20} />
           </div>
           <span className="sidebar__logo-text">SkyCast</span>
-        </div>
+        </NavLink>
 
         <nav className="sidebar__nav">
           {navItems.map(({ to, icon: Icon, label }) => (
@@ -70,22 +80,39 @@ export default function Sidebar({ open, onClose }) {
           ))}
         </nav>
 
-        <div className="sidebar__location-card">
-          <h4>
-            <MapPinned size={14} />
-            Enable Location Access
-          </h4>
-          <p>Allow location access to get weather updates for your current location.</p>
-          <button className="sidebar__location-btn" onClick={requestLocation}>
-            Enable Location
-          </button>
-        </div>
+        {!hasLocation ? (
+          <div className="sidebar__location-card">
+            <h4>
+              <MapPinned size={14} />
+              Enable Location Access
+            </h4>
+            <p>Allow location access to get weather updates for your current location.</p>
+            {locationError && <p className="sidebar__location-error">{locationError}</p>}
+            <button
+              className="sidebar__location-btn"
+              onClick={requestLocation}
+              disabled={locationLoading}
+            >
+              {locationLoading ? (
+                <>
+                  <Loader2 size={14} className="spin" /> Detecting...
+                </>
+              ) : (
+                'Enable Location'
+              )}
+            </button>
+          </div>
+        ) : (
+          <div className="sidebar__current-location">
+            <div className="sidebar__current-location-label">My Current Location</div>
+            <div className="sidebar__current-location-name">
+              {formatLocationLabel(currentLocation)}
+            </div>
+          </div>
+        )}
 
         {current && (
           <div className="sidebar__current-widget">
-            <div className="city">
-              {current.name}, {current.sys?.country}
-            </div>
             <div className="temp-row">
               <div>
                 <div className="temp">
@@ -96,7 +123,11 @@ export default function Sidebar({ open, onClose }) {
                   {capitalize(current.weather?.[0]?.description)}
                 </div>
               </div>
-              <WeatherIcon icon={current.weather?.[0]?.icon} size={36} />
+              <WeatherIcon
+                icon={current.weather?.[0]?.icon}
+                description={current.weather?.[0]?.description}
+                size={36}
+              />
             </div>
           </div>
         )}

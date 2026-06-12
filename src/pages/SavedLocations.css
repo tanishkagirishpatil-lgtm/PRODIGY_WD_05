@@ -236,6 +236,33 @@
   color: var(--accent-purple);
 }
 
+.saved-empty__icon--illustration {
+  position: relative;
+  width: 72px;
+  height: 72px;
+}
+
+.saved-empty__icon-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-purple);
+  color: #fff;
+  border: 2px solid #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.saved-empty__cta {
+  text-decoration: none;
+  margin-top: 4px;
+}
+
 .saved-empty h3 {
   font-size: 18px;
   font-weight: 700;
@@ -245,6 +272,29 @@
   max-width: 300px;
   color: var(--secondary-text);
   font-size: 13px;
+}
+
+@media (max-width: 414px) {
+  .saved-header-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .add-location-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 320px) {
+  .saved-empty {
+    min-height: 280px;
+    padding: 0 16px;
+  }
+
+  .locations-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .add-modal {

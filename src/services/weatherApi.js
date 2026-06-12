@@ -1,41 +1,186 @@
 const API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY;
 const BASE = 'https://api.openweathermap.org';
+const NOMINATIM = 'https://nominatim.openstreetmap.org';
+const FETCH_TIMEOUT = 12000;
 
-async function fetchJson(url) {
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || `Weather API error (${res.status})`);
+export class WeatherApiError extends Error {
+  constructor(message, code = 'API_ERROR') {
+    super(message);
+    this.name = 'WeatherApiError';
+    this.code = code;
   }
-  return res.json();
 }
 
-export function hasApiKey() {
-  return Boolean(API_KEY && API_KEY !== 'your_openweathermap_api_key_here');
+async function fetchWithTimeout(url, options = {}, timeout = FETCH_TIMEOUT) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new WeatherApiError(
+        err.message || `Request failed (${res.status})`,
+        res.status === 401 ? 'INVALID_KEY' : 'API_ERROR'
+      );
+    }
+    return res.json();
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new WeatherApiError('Request timed out. Please try again.', 'TIMEOUT');
+    }
+    if (err instanceof WeatherApiError) throw err;
+    throw new WeatherApiError('Network error. Check your connection.', 'NETWORK');
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export function assertApiKey() {
+  if (!API_KEY || API_KEY === 'your_openweathermap_api_key_here') {
+    throw new WeatherApiError(
+      'OpenWeatherMap API key is missing. Add VITE_OPENWEATHER_API_KEY to your .env file.',
+      'MISSING_KEY'
+    );
+  }
+}
+
+function normalizeOwmResult(item) {
+  return {
+    name: item.name,
+    state: item.state || '',
+    country: item.country,
+    lat: item.lat,
+    lon: item.lon,
+    source: 'openweather',
+  };
+}
+
+function normalizeNominatimResult(item) {
+  const addr = item.address || {};
+  const name =
+    addr.city ||
+    addr.town ||
+    addr.village ||
+    addr.hamlet ||
+    addr.suburb ||
+    addr.locality ||
+    addr.county ||
+    item.display_name?.split(',')[0] ||
+    'Unknown';
+
+  return {
+    name,
+    state: addr.state || addr.region || addr.county || '',
+    country: (addr.country_code || '').toUpperCase(),
+    lat: parseFloat(item.lat),
+    lon: parseFloat(item.lon),
+    source: 'nominatim',
+  };
+}
+
+function dedupeLocations(locations) {
+  const seen = new Map();
+  locations.forEach((loc) => {
+    const key = `${loc.name.toLowerCase()}|${loc.country}|${loc.lat.toFixed(2)}|${loc.lon.toFixed(2)}`;
+    if (!seen.has(key)) seen.set(key, loc);
+  });
+  return [...seen.values()];
+}
+
+export async function searchCitiesOpenWeather(query, limit = 8) {
+  assertApiKey();
+  const data = await fetchWithTimeout(
+    `${BASE}/geo/1.0/direct?q=${encodeURIComponent(query)}&limit=${limit}&appid=${API_KEY}`
+  );
+  return (data || []).map(normalizeOwmResult);
+}
+
+export async function searchCitiesNominatim(query, limit = 8) {
+  const data = await fetchWithTimeout(
+    `${NOMINATIM}/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=${limit}`,
+    {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'SkyCast Weather App (skycast-dashboard)',
+      },
+    }
+  );
+  return (data || []).map(normalizeNominatimResult);
+}
+
+export async function searchLocations(query, limit = 10) {
+  if (!query.trim()) return [];
+
+  let owmResults = [];
+  try {
+    owmResults = await searchCitiesOpenWeather(query, limit);
+  } catch {
+    owmResults = [];
+  }
+
+  if (owmResults.length >= limit) {
+    return owmResults.slice(0, limit);
+  }
+
+  let nominatimResults = [];
+  try {
+    nominatimResults = await searchCitiesNominatim(query, limit);
+  } catch {
+    nominatimResults = [];
+  }
+
+  return dedupeLocations([...owmResults, ...nominatimResults]).slice(0, limit);
+}
+
+export async function reverseGeocodeOpenWeather(lat, lon) {
+  assertApiKey();
+  const data = await fetchWithTimeout(
+    `${BASE}/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${API_KEY}`
+  );
+  if (!data?.length) throw new WeatherApiError('Could not resolve location name.', 'GEOCODE');
+  return normalizeOwmResult(data[0]);
+}
+
+export async function reverseGeocodeNominatim(lat, lon) {
+  const data = await fetchWithTimeout(
+    `${NOMINATIM}/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`,
+    {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'SkyCast Weather App (skycast-dashboard)',
+      },
+    }
+  );
+  if (!data) throw new WeatherApiError('Could not resolve location name.', 'GEOCODE');
+  return normalizeNominatimResult(data);
+}
+
+export async function reverseGeocode(lat, lon) {
+  try {
+    return await reverseGeocodeOpenWeather(lat, lon);
+  } catch {
+    return reverseGeocodeNominatim(lat, lon);
+  }
 }
 
 export async function getCurrentWeather(lat, lon) {
-  return fetchJson(
+  assertApiKey();
+  return fetchWithTimeout(
     `${BASE}/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}`
   );
 }
 
 export async function getForecast(lat, lon) {
-  return fetchJson(
+  assertApiKey();
+  return fetchWithTimeout(
     `${BASE}/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}`
   );
 }
 
 export async function getAirQuality(lat, lon) {
-  return fetchJson(
+  assertApiKey();
+  return fetchWithTimeout(
     `${BASE}/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${API_KEY}`
-  );
-}
-
-export async function searchCities(query, limit = 6) {
-  if (!query.trim()) return [];
-  return fetchJson(
-    `${BASE}/geo/1.0/direct?q=${encodeURIComponent(query)}&limit=${limit}&appid=${API_KEY}`
   );
 }
 
@@ -48,12 +193,15 @@ export async function getWeatherByCoords(lat, lon) {
   return { current, forecast, airQuality };
 }
 
-export async function getWeatherByCity(city) {
-  const cities = await searchCities(city, 1);
-  if (!cities.length) throw new Error('City not found');
-  const { lat, lon } = cities[0];
-  const data = await getWeatherByCoords(lat, lon);
-  return { ...data, geo: cities[0] };
+export async function getWeatherByLocation(location) {
+  const data = await getWeatherByCoords(location.lat, location.lon);
+  return { ...data, geo: location };
+}
+
+export async function getWeatherByCityQuery(query) {
+  const cities = await searchLocations(query, 1);
+  if (!cities.length) throw new WeatherApiError(`No results found for "${query}".`, 'NOT_FOUND');
+  return getWeatherByLocation(cities[0]);
 }
 
 export function groupForecastByDay(forecastList, timezoneOffset = 0) {
@@ -86,59 +234,14 @@ export function groupForecastByDay(forecastList, timezoneOffset = 0) {
   });
 }
 
-export function getDemoWeather() {
-  const now = Math.floor(Date.now() / 1000);
-  const tzOffset = -new Date().getTimezoneOffset() * 60;
+export function getAqiValue(airQuality) {
+  const aqi = airQuality?.list?.[0]?.main?.aqi;
+  if (!aqi) return null;
+  return aqi * 25;
+}
 
-  const today = new Date();
-  today.setHours(5, 56, 0, 0);
-  const sunrise = Math.floor(today.getTime() / 1000) - tzOffset;
-  today.setHours(19, 2, 0, 0);
-  const sunset = Math.floor(today.getTime() / 1000) - tzOffset;
-
-  return {
-    current: {
-      name: 'Bangalore',
-      sys: { country: 'IN', sunrise, sunset },
-      main: {
-        temp: 300.15,
-        feels_like: 302.15,
-        temp_min: 294.15,
-        temp_max: 305.15,
-        humidity: 64,
-        pressure: 1013,
-      },
-      weather: [{ main: 'Clouds', description: 'partly cloudy', icon: '02d' }],
-      wind: { speed: 5, deg: 225 },
-      visibility: 10000,
-      dt: now,
-      timezone: tzOffset,
-      coord: { lat: 12.9716, lon: 77.5946 },
-    },
-    forecast: {
-      list: Array.from({ length: 40 }, (_, i) => ({
-        dt: now + i * 10800,
-        main: {
-          temp: 298 + Math.sin(i / 3) * 5,
-          temp_min: 293 + Math.sin(i / 3) * 3,
-          temp_max: 303 + Math.sin(i / 3) * 4,
-          humidity: 60 + (i % 5) * 3,
-          pressure: 1013,
-        },
-        weather: [
-          {
-            main: ['Clear', 'Clouds', 'Rain'][i % 3],
-            description: ['clear sky', 'partly cloudy', 'light rain'][i % 3],
-            icon: ['01d', '02d', '10d'][i % 3],
-          },
-        ],
-        wind: { speed: 4 + (i % 3), deg: 200 + i * 5 },
-        pop: i % 4 === 0 ? 0.6 : 0.1,
-      })),
-      city: { timezone: tzOffset },
-    },
-    airQuality: {
-      list: [{ main: { aqi: 2 }, components: { pm2_5: 15 } }],
-    },
-  };
+export function formatLocationLabel(location) {
+  if (!location) return '';
+  const state = location.state ? `, ${location.state}` : '';
+  return `${location.name}${state}`;
 }

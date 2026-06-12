@@ -1,7 +1,9 @@
-export default function MetricCard({ icon, label, value, sub, color = '#7C5CFF' }) {
+import { memo } from 'react';
+
+function MetricCard({ icon, label, value, sub, color = '#7C5CFF' }) {
   return (
-    <div className="metric-card card fade-in">
-      <div className="metric-card__icon" style={{ background: `${color}15`, color }}>
+    <div className="metric-card card fade-in" role="group" aria-label={`${label}: ${value}${sub ? `, ${sub}` : ''}`}>
+      <div className="metric-card__icon" style={{ background: `${color}15`, color }} aria-hidden="true">
         {icon}
       </div>
       <div className="metric-card__label">{label}</div>
@@ -10,3 +12,5 @@ export default function MetricCard({ icon, label, value, sub, color = '#7C5CFF' 
     </div>
   );
 }
+
+export default memo(MetricCard);

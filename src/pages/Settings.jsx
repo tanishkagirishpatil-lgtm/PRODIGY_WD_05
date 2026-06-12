@@ -1,7 +1,6 @@
 import { useOutletContext } from 'react-router-dom';
 import TopNavbar from '../components/layout/TopNavbar';
 import { useApp } from '../context/AppContextCore';
-import { hasApiKey } from '../services/weatherApi';
 import './Settings.css';
 
 function Toggle({ on, onChange }) {
@@ -21,7 +20,7 @@ function Toggle({ on, onChange }) {
 
 export default function Settings() {
   const { onMenuClick } = useOutletContext();
-  const { settings, updateSetting, requestLocation } = useApp();
+  const { settings, updateSetting, requestLocation, locationLoading, locationError } = useApp();
 
   return (
     <>
@@ -32,13 +31,7 @@ export default function Settings() {
       />
 
       <div className="main-layout__content settings-page fade-in">
-        {!hasApiKey() && (
-          <div className="api-notice">
-            Add your OpenWeatherMap API key to <code>.env</code> as{' '}
-            <code>VITE_OPENWEATHER_API_KEY</code> for live weather data. Demo data is shown
-            until configured.
-          </div>
-        )}
+        {locationError && <div className="error-banner">{locationError}</div>}
 
         <div className="settings-section">
           <h3>Units & Display</h3>
@@ -168,8 +161,9 @@ export default function Settings() {
               type="button"
               className={`settings-btn ${settings.locationEnabled ? 'settings-btn--outline' : ''}`}
               onClick={requestLocation}
+              disabled={locationLoading}
             >
-              {settings.locationEnabled ? 'Refresh Location' : 'Enable Location'}
+              {locationLoading ? 'Detecting...' : settings.locationEnabled ? 'Refresh Location' : 'Enable Location'}
             </button>
           </div>
         </div>

@@ -233,7 +233,7 @@ export default function Profile() {
               <button
                 type="button"
                 className="logout-btn"
-                onClick={() => setNotice('This demo website has no active login session.')}
+                onClick={() => setNotice('You have been logged out.')}
               >
                 <LogOut size={16} />
                 Log Out
