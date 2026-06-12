@@ -1,0 +1,12 @@
+.sidebar-illustration {
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(16, 42, 86, 0.06);
+  transition: opacity 0.8s ease;
+}
+
+.sidebar-illustration--night,
+.sidebar-illustration--evening {
+  box-shadow: 0 2px 12px rgba(16, 42, 86, 0.12);
+}

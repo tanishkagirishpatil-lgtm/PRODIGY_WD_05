@@ -1,0 +1,318 @@
+.app-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  --bg-base: #f7f9fc;
+  --orb-1: rgba(124, 92, 255, 0.12);
+  --orb-2: rgba(77, 171, 247, 0.1);
+  --orb-3: rgba(243, 238, 255, 0.8);
+  transition: --bg-base 1.2s ease;
+}
+
+.app-background__gradient {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 0%, var(--orb-1) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 90% 10%, var(--orb-2) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 40% at 50% 100%, var(--orb-3) 0%, transparent 60%),
+    linear-gradient(180deg, var(--bg-base) 0%, color-mix(in srgb, var(--bg-base) 90%, #ddeeff) 45%, var(--bg-base) 100%);
+  transition: background 1.5s ease;
+}
+
+.app-background__orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.5;
+  animation: floatOrb 22s ease-in-out infinite;
+  transition: background 1.5s ease;
+}
+
+.app-background__orb--1 {
+  width: 420px;
+  height: 420px;
+  top: -120px;
+  right: 10%;
+  background: var(--orb-1);
+}
+
+.app-background__orb--2 {
+  width: 320px;
+  height: 320px;
+  bottom: 5%;
+  left: 5%;
+  background: var(--orb-2);
+  animation-delay: -7s;
+}
+
+.app-background__orb--3 {
+  width: 280px;
+  height: 280px;
+  top: 40%;
+  right: 25%;
+  background: var(--orb-3);
+  animation-delay: -14s;
+}
+
+.app-background__grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(231, 236, 245, 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(231, 236, 245, 0.3) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 90% 80% at 50% 30%, black 15%, transparent 75%);
+  opacity: 0.45;
+}
+
+.app-background__horizon {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 120px;
+  background: linear-gradient(to top, rgba(82, 183, 136, 0.04) 0%, transparent 100%);
+  opacity: 0.6;
+}
+
+/* Floating clouds */
+.app-background__clouds {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.app-background__cloud {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  opacity: 0.35;
+  filter: blur(2px);
+}
+
+.app-background__cloud::before,
+.app-background__cloud::after {
+  content: '';
+  position: absolute;
+  background: inherit;
+  border-radius: 50%;
+}
+
+.app-background__cloud--1 {
+  width: 120px;
+  height: 40px;
+  top: 8%;
+  left: -140px;
+  animation: driftCloud 45s linear infinite;
+}
+
+.app-background__cloud--1::before {
+  width: 50px;
+  height: 50px;
+  top: -25px;
+  left: 20px;
+}
+
+.app-background__cloud--1::after {
+  width: 60px;
+  height: 45px;
+  top: -20px;
+  left: 55px;
+}
+
+.app-background__cloud--2 {
+  width: 100px;
+  height: 35px;
+  top: 18%;
+  left: -120px;
+  animation: driftCloud 55s linear infinite;
+  animation-delay: -20s;
+  opacity: 0.25;
+}
+
+.app-background__cloud--2::before {
+  width: 45px;
+  height: 45px;
+  top: -22px;
+  left: 15px;
+}
+
+.app-background__cloud--2::after {
+  width: 50px;
+  height: 40px;
+  top: -18px;
+  left: 45px;
+}
+
+.app-background__cloud--3 {
+  width: 140px;
+  height: 45px;
+  top: 5%;
+  left: -160px;
+  animation: driftCloud 60s linear infinite;
+  animation-delay: -35s;
+  opacity: 0.3;
+}
+
+.app-background__cloud--3::before {
+  width: 55px;
+  height: 55px;
+  top: -28px;
+  left: 25px;
+}
+
+.app-background__cloud--3::after {
+  width: 65px;
+  height: 50px;
+  top: -22px;
+  left: 65px;
+}
+
+.app-background__cloud--4 {
+  width: 90px;
+  height: 30px;
+  top: 25%;
+  left: -110px;
+  animation: driftCloud 50s linear infinite;
+  animation-delay: -10s;
+  opacity: 0.2;
+}
+
+.app-background__cloud--4::before {
+  width: 40px;
+  height: 40px;
+  top: -20px;
+  left: 12px;
+}
+
+.app-background__cloud--4::after {
+  width: 45px;
+  height: 35px;
+  top: -16px;
+  left: 40px;
+}
+
+/* Rain overlay */
+.app-background__rain {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0.25;
+}
+
+.app-background__drop {
+  position: absolute;
+  top: -20px;
+  width: 1px;
+  height: 18px;
+  background: linear-gradient(to bottom, transparent, #6B9BD1);
+  animation: fallRain linear infinite;
+}
+
+/* Stars */
+.app-background__stars {
+  position: absolute;
+  inset: 0;
+}
+
+.app-background__star {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  opacity: 0.6;
+  animation: twinkle 3s ease-in-out infinite;
+}
+
+/* Time-of-day modifiers */
+.app-background--evening .app-background__cloud,
+.app-background--dawn .app-background__cloud {
+  opacity: 0.45;
+  background: #FFF5EE;
+}
+
+.app-background--night .app-background__cloud {
+  opacity: 0.08;
+  background: #8898B0;
+}
+
+.app-background--night .app-background__grid {
+  opacity: 0.15;
+}
+
+.app-background--rain .app-background__cloud {
+  opacity: 0.55;
+  background: #C8D8EA;
+}
+
+@keyframes floatOrb {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(20px, -15px) scale(1.05);
+  }
+  66% {
+    transform: translate(-15px, 10px) scale(0.95);
+  }
+}
+
+@keyframes driftCloud {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(100vw + 300px));
+  }
+}
+
+@keyframes fallRain {
+  from {
+    transform: translateY(-20px);
+  }
+  to {
+    transform: translateY(100vh);
+  }
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.2);
+  }
+}
+
+[data-theme='dark'] .app-background__gradient {
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 0%, rgba(124, 92, 255, 0.15) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 90% 10%, rgba(77, 171, 247, 0.1) 0%, transparent 50%),
+    linear-gradient(180deg, #0a1020 0%, #131f38 50%, #0a1020 100%);
+}
+
+[data-theme='dark'] .app-background__grid {
+  background-image:
+    linear-gradient(rgba(42, 54, 84, 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(42, 54, 84, 0.35) 1px, transparent 1px);
+}
+
+[data-theme='dark'] .app-background__cloud {
+  background: #3a4a68;
+  opacity: 0.15;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-background__orb,
+  .app-background__cloud,
+  .app-background__drop,
+  .app-background__star {
+    animation: none !important;
+  }
+}
